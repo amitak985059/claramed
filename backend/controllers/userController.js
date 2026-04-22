@@ -130,43 +130,55 @@ const updateProfile = async (req, res) => {
     }
 }
 
-// API to book appointment 
+// API to book appointment (concurrency-safe with atomic MongoDB update)
 const bookAppointment = async (req, res) => {
 
     try {
 
         const { userId, docId, slotDate, slotTime } = req.body
-        const docData = await doctorModel.findById(docId).select("-password")
 
-        if (!docData.available) {
-            return res.json({ success: false, message: 'Doctor Not Available' })
+        // --- Step 1: Atomically claim the slot ---
+        // This single query does THREE things at the database level:
+        //   a) Checks the doctor is available
+        //   b) Checks the slot is NOT already in slots_booked[slotDate]
+        //   c) Pushes the slotTime into slots_booked[slotDate]
+        // If two users hit this simultaneously, MongoDB ensures only ONE wins.
+        const updatedDoctor = await doctorModel.findOneAndUpdate(
+            {
+                _id: docId,
+                available: true,
+                // slot must NOT already be booked for this date
+                [`slots_booked.${slotDate}`]: { $not: { $elemMatch: { $eq: slotTime } } }
+            },
+            {
+                // atomically add the slotTime to the date's array
+                $push: { [`slots_booked.${slotDate}`]: slotTime }
+            },
+            { new: true }
+        )
+
+        // If updatedDoctor is null → either doctor unavailable OR slot already taken
+        if (!updatedDoctor) {
+            // Distinguish between "doctor unavailable" and "slot taken" for a better UX message
+            const doctor = await doctorModel.findById(docId).select('available')
+            if (!doctor || !doctor.available) {
+                return res.json({ success: false, message: 'Doctor Not Available' })
+            }
+            return res.json({ success: false, message: 'Slot Not Available' })
         }
 
-        let slots_booked = docData.slots_booked
-
-        // checking for slot availablity 
-        if (slots_booked[slotDate]) {
-            if (slots_booked[slotDate].includes(slotTime)) {
-                return res.json({ success: false, message: 'Slot Not Available' })
-            }
-            else {
-                slots_booked[slotDate].push(slotTime)
-            }
-        } else {
-            slots_booked[slotDate] = []
-            slots_booked[slotDate].push(slotTime)
-        }
-
+        // --- Step 2: Fetch user data and save the appointment ---
         const userData = await userModel.findById(userId).select("-password")
 
-        delete docData.slots_booked
+        const docData = { ...updatedDoctor.toObject() }
+        delete docData.slots_booked   // don't snapshot the full slots map in the appointment
 
         const appointmentData = {
             userId,
             docId,
             userData,
             docData,
-            amount: docData.fees,
+            amount: updatedDoctor.fees,
             slotTime,
             slotDate,
             date: Date.now()
@@ -174,9 +186,6 @@ const bookAppointment = async (req, res) => {
 
         const newAppointment = new appointmentModel(appointmentData)
         await newAppointment.save()
-
-        // save new slots data in docData
-        await doctorModel.findByIdAndUpdate(docId, { slots_booked })
 
         res.json({ success: true, message: 'Appointment Booked' })
 
