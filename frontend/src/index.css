@@ -21,3 +21,8 @@
 ::-webkit-scrollbar {
     @apply hidden
 }
+
+/* Dark mode body background */
+body {
+    @apply bg-white dark:bg-gray-900 transition-colors duration-300;
+}

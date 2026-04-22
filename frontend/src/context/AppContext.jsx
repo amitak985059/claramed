@@ -13,6 +13,25 @@ const AppContextProvider = (props) => {
     const [token, setToken] = useState(localStorage.getItem('token') ? localStorage.getItem('token') : '')
     const [userData, setUserData] = useState(false)
 
+    // Dark mode — default to system preference, persist user choice
+    const [darkMode, setDarkMode] = useState(() => {
+        const saved = localStorage.getItem('darkMode')
+        if (saved !== null) return saved === 'true'
+        return window.matchMedia('(prefers-color-scheme: dark)').matches
+    })
+
+    // Sync dark class on <html> and persist preference
+    useEffect(() => {
+        if (darkMode) {
+            document.documentElement.classList.add('dark')
+        } else {
+            document.documentElement.classList.remove('dark')
+        }
+        localStorage.setItem('darkMode', darkMode)
+    }, [darkMode])
+
+    const toggleDarkMode = () => setDarkMode(prev => !prev)
+
     // Getting Doctors using API
     const getDoctosData = async () => {
 
@@ -67,7 +86,8 @@ const AppContextProvider = (props) => {
         currencySymbol,
         backendUrl,
         token, setToken,
-        userData, setUserData, loadUserProfileData
+        userData, setUserData, loadUserProfileData,
+        darkMode, toggleDarkMode
     }
 
     return (
