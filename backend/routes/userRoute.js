@@ -5,6 +5,7 @@ import {
     paymentRazorpay, verifyRazorpay, paymentStripe, verifyStripe
 } from '../controllers/userController.js';
 import { addReview, getDoctorReviews, getAppointmentReview } from '../controllers/reviewController.js';
+import { getPrescription, myPrescriptions } from '../controllers/prescriptionController.js';
 import upload from '../middleware/multer.js';
 import authUser from '../middleware/authUser.js';
 
@@ -32,8 +33,10 @@ userRouter.post("/verifyStripe", authUser, verifyStripe)
 // ─── Reviews ───────────────────────────────────────────────────────────────────
 userRouter.post("/add-review", authUser, addReview)
 userRouter.get("/review/:appointmentId", authUser, getAppointmentReview)
-
-// ─── Public: doctor reviews (no auth needed) ──────────────────────────────────
 userRouter.get("/doctor-reviews/:docId", getDoctorReviews)
+
+// ─── Prescriptions ─────────────────────────────────────────────────────────────
+userRouter.get("/prescription/:appointmentId", authUser, getPrescription)
+userRouter.get("/my-prescriptions", authUser, myPrescriptions)
 
 export default userRouter;
