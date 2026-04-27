@@ -21,6 +21,12 @@ const TopDoctors = () => {
                             </div>
                             <p className='text-[#262626] dark:text-gray-100 text-lg font-medium'>{item.name}</p>
                             <p className='text-[#5C5C5C] dark:text-gray-400 text-sm'>{item.speciality}</p>
+                            {item.totalReviews > 0 && (
+                                <div className='flex items-center gap-1 mt-1'>
+                                    <span className='text-yellow-400 text-xs'>{'★'.repeat(Math.round(item.averageRating))}{'☆'.repeat(5 - Math.round(item.averageRating))}</span>
+                                    <span className='text-xs text-gray-400'>({item.totalReviews})</span>
+                                </div>
+                            )}
                         </div>
                     </div>
                 ))}

@@ -8,6 +8,7 @@ import appointmentModel from "../models/appointmentModel.js";
 import { v2 as cloudinary } from 'cloudinary'
 import stripe from "stripe";
 import razorpay from 'razorpay';
+import { sendBookingConfirmation, sendCancellationEmail } from '../utils/emailService.js'
 
 // Gateway Initialize
 const stripeInstance = new stripe(process.env.STRIPE_SECRET_KEY)
@@ -154,6 +155,20 @@ const bookAppointment = async (req, res) => {
         })
         await newAppointment.save()
 
+        // ── Send confirmation email (non-blocking) ────────────────────────────
+        const [day, month, year] = slotDate.split('_')
+        const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+        const formattedDate = `${day} ${months[Number(month) - 1]} ${year}`
+        sendBookingConfirmation({
+            patientEmail: userData.email,
+            patientName: userData.name,
+            doctorName: updatedDoctor.name,
+            speciality: updatedDoctor.speciality,
+            slotDate: formattedDate,
+            slotTime,
+            fees: updatedDoctor.fees,
+        })
+
         res.status(201).json({ success: true, message: 'Appointment Booked' })
 
     } catch (error) {
@@ -180,6 +195,17 @@ const cancelAppointment = async (req, res) => {
         const { docId, slotDate, slotTime } = appointmentData
         await doctorModel.findByIdAndUpdate(docId, {
             $pull: { [`slots_booked.${slotDate}`]: slotTime }
+        })
+
+        // ── Send cancellation email (non-blocking) ────────────────────────────
+        const [day, month, year] = slotDate.split('_')
+        const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+        sendCancellationEmail({
+            patientEmail: appointmentData.userData.email,
+            patientName: appointmentData.userData.name,
+            doctorName: appointmentData.docData.name,
+            slotDate: `${day} ${months[Number(month) - 1]} ${year}`,
+            slotTime,
         })
 
         res.json({ success: true, message: 'Appointment Cancelled' })

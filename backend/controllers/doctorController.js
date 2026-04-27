@@ -2,6 +2,7 @@ import jwt from "jsonwebtoken";
 import bcrypt from "bcrypt";
 import doctorModel from "../models/doctorModel.js";
 import appointmentModel from "../models/appointmentModel.js";
+import { sendCompletionEmail } from '../utils/emailService.js'
 
 // ─── Helper: issue short-lived access token ───────────────────────────────────
 const signDoctorToken = (id) =>
@@ -91,6 +92,17 @@ const appointmentComplete = async (req, res) => {
         }
 
         await appointmentModel.findByIdAndUpdate(appointmentId, { isCompleted: true })
+
+        // ── Send completion email prompting patient to leave a review (non-blocking)
+        const [day, month, year] = appointmentData.slotDate.split('_')
+        const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+        sendCompletionEmail({
+            patientEmail: appointmentData.userData.email,
+            patientName: appointmentData.userData.name,
+            doctorName: appointmentData.docData.name,
+            slotDate: `${day} ${months[Number(month) - 1]} ${year}`,
+        })
+
         res.json({ success: true, message: 'Appointment Completed' })
 
     } catch (error) {
@@ -179,8 +191,35 @@ const doctorDashboard = async (req, res) => {
     }
 }
 
+// ─── Update Doctor Schedule ───────────────────────────────────────────────────
+const updateSchedule = async (req, res) => {
+    try {
+        const { docId, workDays, startHour, endHour, slotDuration } = req.body
+
+        if (!Array.isArray(workDays) || workDays.some(d => d < 0 || d > 6)) {
+            return res.status(400).json({ success: false, message: 'workDays must be an array of 0–6 (Sun–Sat)' })
+        }
+        if (startHour < 0 || startHour >= endHour || endHour > 23) {
+            return res.status(400).json({ success: false, message: 'Invalid startHour / endHour' })
+        }
+        if (![15, 20, 30, 45, 60].includes(Number(slotDuration))) {
+            return res.status(400).json({ success: false, message: 'slotDuration must be 15, 20, 30, 45, or 60 minutes' })
+        }
+
+        await doctorModel.findByIdAndUpdate(docId, {
+            schedule: { workDays, startHour, endHour, slotDuration: Number(slotDuration) }
+        })
+
+        res.json({ success: true, message: 'Schedule updated successfully' })
+
+    } catch (error) {
+        console.error(error)
+        res.status(500).json({ success: false, message: error.message })
+    }
+}
+
 export {
     loginDoctor, appointmentsDoctor, appointmentCancel,
     doctorList, changeAvailablity, appointmentComplete,
-    doctorDashboard, doctorProfile, updateDoctorProfile
+    doctorDashboard, doctorProfile, updateDoctorProfile, updateSchedule
 }
