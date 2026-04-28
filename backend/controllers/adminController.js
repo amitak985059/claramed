@@ -5,6 +5,7 @@ import { v2 as cloudinary } from "cloudinary";
 import appointmentModel from "../models/appointmentModel.js";
 import doctorModel from "../models/doctorModel.js";
 import userModel from "../models/userModel.js";
+import { sendCompletionEmail, sendReminderEmail } from "../utils/emailService.js";
 
 // ─── Helper: sign admin token with role claim ─────────────────────────────────
 const signAdminToken = () =>
@@ -178,4 +179,72 @@ const adminDashboard = async (req, res) => {
     }
 }
 
-export { loginAdmin, appointmentsAdmin, appointmentCancel, addDoctor, allDoctors, adminDashboard }
+// ─── Mark Appointment Complete (Admin) ───────────────────────────────────────────────
+const appointmentComplete = async (req, res) => {
+    try {
+        const { appointmentId } = req.body
+        const appt = await appointmentModel.findById(appointmentId)
+        if (!appt) return res.status(404).json({ success: false, message: 'Appointment not found' })
+
+        if (appt.cancelled || appt.isCompleted) {
+            return res.status(400).json({ success: false, message: 'Cannot mark as complete. Appointment is already completed or cancelled.' })
+        }
+
+        await appointmentModel.findByIdAndUpdate(appointmentId, { isCompleted: true })
+        
+        const userData = await userModel.findById(appt.userId)
+        const doctorData = await doctorModel.findById(appt.docId)
+
+        // Trigger email
+        if (userData && doctorData) {
+             await sendCompletionEmail({
+                patientEmail: userData.email,
+                patientName: userData.name,
+                doctorName: doctorData.name,
+                slotDate: appt.slotDate
+            })
+        }
+
+        res.json({ success: true, message: 'Appointment Marked Completed' })
+
+    } catch (error) {
+        console.error(error)
+        res.status(500).json({ success: false, message: error.message })
+    }
+}
+
+// ─── Send Appointment Reminder (Admin) ───────────────────────────────────────────────
+const appointmentReminder = async (req, res) => {
+    try {
+        const { appointmentId } = req.body
+        const appt = await appointmentModel.findById(appointmentId)
+        if (!appt) return res.status(404).json({ success: false, message: 'Appointment not found' })
+
+        if (appt.cancelled || appt.isCompleted) {
+            return res.status(400).json({ success: false, message: 'Cannot send reminder for cancelled or completed appointment' })
+        }
+        
+        const userData = await userModel.findById(appt.userId)
+        const doctorData = await doctorModel.findById(appt.docId)
+
+        if (userData && doctorData) {
+             await sendReminderEmail({
+                patientEmail: userData.email,
+                patientName: userData.name,
+                doctorName: doctorData.name,
+                speciality: doctorData.speciality,
+                slotDate: appt.slotDate,
+                slotTime: appt.slotTime
+            })
+            res.json({ success: true, message: 'Reminder email sent successfully' })
+        } else {
+             res.status(404).json({ success: false, message: 'User or Doctor details not found' })
+        }
+
+    } catch (error) {
+        console.error(error)
+        res.status(500).json({ success: false, message: error.message })
+    }
+}
+
+export { loginAdmin, appointmentsAdmin, appointmentCancel, addDoctor, allDoctors, adminDashboard, appointmentComplete, appointmentReminder }

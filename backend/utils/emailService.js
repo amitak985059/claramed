@@ -108,3 +108,26 @@ export const sendCompletionEmail = async ({ patientEmail, patientName, doctorNam
         </div>`,
     })
 }
+
+/** Sent to patient to remind them of upcoming appointment */
+export const sendReminderEmail = async ({ patientEmail, patientName, doctorName, speciality, slotDate, slotTime }) => {
+    await sendEmail({
+        to: patientEmail,
+        subject: `Appointment Reminder — Dr. ${doctorName}`,
+        html: `
+        <div style="font-family:sans-serif;max-width:560px;margin:auto;padding:24px;border:1px solid #e5e7eb;border-radius:12px">
+            <div style="background:#f59e0b;padding:16px 24px;border-radius:8px;text-align:center">
+                <h2 style="color:#fff;margin:0">Appointment Reminder ⏰</h2>
+            </div>
+            <p style="margin-top:24px">Hi <strong>${patientName}</strong>,</p>
+            <p>This is a friendly reminder for your upcoming appointment.</p>
+            <table style="width:100%;border-collapse:collapse;margin:16px 0">
+                <tr style="background:#f3f4f6"><td style="padding:10px 14px;font-weight:600">Doctor</td><td style="padding:10px 14px">Dr. ${doctorName} (${speciality})</td></tr>
+                <tr><td style="padding:10px 14px;font-weight:600">Date</td><td style="padding:10px 14px">${slotDate}</td></tr>
+                <tr style="background:#f3f4f6"><td style="padding:10px 14px;font-weight:600">Time</td><td style="padding:10px 14px">${slotTime}</td></tr>
+            </table>
+            <p style="color:#6b7280;font-size:13px">Please arrive 10 minutes before your scheduled time.</p>
+            <p style="margin-top:24px">See you soon,<br><strong>The Claramed Team</strong></p>
+        </div>`,
+    })
+}
