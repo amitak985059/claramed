@@ -3,6 +3,7 @@ import { DoctorContext } from '../../context/DoctorContext'
 import { AppContext } from '../../context/AppContext'
 import { toast } from 'react-toastify'
 import axios from 'axios'
+import ClinicQRCodeModal from '../../components/ClinicQRCodeModal'
 
 const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 const SLOT_DURATIONS = [15, 20, 30, 45, 60]
@@ -13,6 +14,7 @@ const DoctorProfile = () => {
     const { currency, backendUrl } = useContext(AppContext)
     const [isEdit, setIsEdit] = useState(false)
     const [scheduleEdit, setScheduleEdit] = useState(false)
+    const [showQR, setShowQR] = useState(false)
     const [schedule, setSchedule] = useState({
         workDays: [1, 2, 3, 4, 5],
         startHour: 10,
@@ -144,10 +146,20 @@ const DoctorProfile = () => {
                         <label>Available</label>
                     </div>
 
-                    {isEdit
-                        ? <button onClick={updateProfile} className='px-4 py-1 border border-primary text-sm rounded-full mt-5 hover:bg-primary hover:text-white transition-all'>Save</button>
-                        : <button onClick={() => setIsEdit(true)} className='px-4 py-1 border border-primary text-sm rounded-full mt-5 hover:bg-primary hover:text-white transition-all'>Edit Profile</button>
-                    }
+                    <div className='flex gap-3'>
+                        {isEdit
+                            ? <button onClick={updateProfile} className='px-4 py-1 border border-primary text-sm rounded-full mt-5 hover:bg-primary hover:text-white transition-all'>Save</button>
+                            : <button onClick={() => setIsEdit(true)} className='px-4 py-1 border border-primary text-sm rounded-full mt-5 hover:bg-primary hover:text-white transition-all'>Edit Profile</button>
+                        }
+                        {!isEdit && (
+                            <button 
+                                onClick={() => setShowQR(true)} 
+                                className='px-4 py-1 bg-indigo-50 border border-indigo-200 text-indigo-600 text-sm rounded-full mt-5 hover:bg-indigo-600 hover:text-white transition-all flex items-center gap-1'
+                            >
+                                <span>📱</span> Get Clinic QR Code
+                            </button>
+                        )}
+                    </div>
                 </div>
 
                 {/* ── Schedule Editor ── */}
@@ -236,6 +248,14 @@ const DoctorProfile = () => {
                     </p>
                 </div>
             </div>
+
+            {/* QR Code Modal */}
+            {showQR && (
+                <ClinicQRCodeModal 
+                    profileData={profileData} 
+                    onClose={() => setShowQR(false)} 
+                />
+            )}
         </div>
     )
 }
