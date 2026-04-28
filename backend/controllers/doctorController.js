@@ -2,6 +2,7 @@ import jwt from "jsonwebtoken";
 import bcrypt from "bcrypt";
 import doctorModel from "../models/doctorModel.js";
 import appointmentModel from "../models/appointmentModel.js";
+import medicalRecordModel from "../models/medicalRecordModel.js";
 import { sendCompletionEmail } from '../utils/emailService.js'
 
 // ─── Helper: issue short-lived access token ───────────────────────────────────
@@ -218,8 +219,24 @@ const updateSchedule = async (req, res) => {
     }
 }
 
+// ─── Get Patient Medical Records ──────────────────────────────────────────────
+const getPatientRecords = async (req, res) => {
+    try {
+        const { userId } = req.query; // Passed in query since it's a GET request
+        if (!userId) {
+            return res.status(400).json({ success: false, message: 'Patient ID is required' })
+        }
+        const records = await medicalRecordModel.find({ userId }).sort({ date: -1 });
+        res.json({ success: true, records });
+    } catch (error) {
+        console.error(error)
+        res.status(500).json({ success: false, message: error.message })
+    }
+}
+
 export {
     loginDoctor, appointmentsDoctor, appointmentCancel,
     doctorList, changeAvailablity, appointmentComplete,
-    doctorDashboard, doctorProfile, updateDoctorProfile, updateSchedule
+    doctorDashboard, doctorProfile, updateDoctorProfile, updateSchedule,
+    getPatientRecords
 }

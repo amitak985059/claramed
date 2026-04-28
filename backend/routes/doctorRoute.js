@@ -2,7 +2,8 @@ import express from 'express';
 import {
     loginDoctor, appointmentsDoctor, appointmentCancel,
     doctorList, changeAvailablity, appointmentComplete,
-    doctorDashboard, doctorProfile, updateDoctorProfile, updateSchedule
+    doctorDashboard, doctorProfile, updateDoctorProfile, updateSchedule,
+    getPatientRecords
 } from '../controllers/doctorController.js';
 import { savePrescription, getPrescription } from '../controllers/prescriptionController.js';
 import authDoctor from '../middleware/authDoctor.js';
@@ -28,5 +29,8 @@ doctorRouter.post("/update-schedule", authDoctor, updateSchedule)
 // ─── Prescriptions ─────────────────────────────────────────────────────────────
 doctorRouter.post("/prescription", authDoctor, savePrescription)
 doctorRouter.get("/prescription/:appointmentId", authDoctor, getPrescription)
+
+// ─── AI Smart Records ──────────────────────────────────────────────────────────
+doctorRouter.get("/patient-records", authDoctor, getPatientRecords)
 
 export default doctorRouter;

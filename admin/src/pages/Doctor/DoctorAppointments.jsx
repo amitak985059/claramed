@@ -164,6 +164,7 @@ const PrescriptionEditor = ({ appointment, dToken, backendUrl, onClose }) => {
 // ─── Chat Window (admin-side) ─────────────────────────────────────────────────
 import ChatWindow from '../../components/ChatWindow'
 import VideoCallWindow from '../../components/VideoCallWindow'
+import PatientRecordsModal from '../../components/PatientRecordsModal'
 
 const DoctorAppointments = () => {
   const { dToken, appointments, getAppointments, cancelAppointment, completeAppointment, profileData, getProfileData } = useContext(DoctorContext)
@@ -172,6 +173,7 @@ const DoctorAppointments = () => {
   const [prescriptionAppt, setPrescriptionAppt] = useState(null)
   const [chatAppt, setChatAppt] = useState(null)
   const [videoAppt, setVideoAppt] = useState(null)
+  const [recordsAppt, setRecordsAppt] = useState(null)
 
   useEffect(() => {
     if (dToken) {
@@ -211,10 +213,16 @@ const DoctorAppointments = () => {
               ) : item.isCompleted ? (
                 <div className='flex flex-col gap-1'>
                   <p className='text-green-500 text-xs font-medium'>Completed</p>
-                  <button
-                    onClick={() => setPrescriptionAppt(item)}
-                    className='text-xs border border-emerald-500 text-emerald-600 px-2 py-0.5 rounded-full hover:bg-emerald-500 hover:text-white transition-all'
-                  >📋 Rx</button>
+                  <div className='flex gap-1'>
+                    <button
+                      onClick={() => setPrescriptionAppt(item)}
+                      className='flex-1 text-[10px] border border-emerald-500 text-emerald-600 px-1.5 py-0.5 rounded-full hover:bg-emerald-500 hover:text-white transition-all'
+                    >📋 Rx</button>
+                    <button
+                      onClick={() => setRecordsAppt(item)}
+                      className='flex-1 text-[10px] border border-purple-500 text-purple-600 px-1.5 py-0.5 rounded-full hover:bg-purple-500 hover:text-white transition-all'
+                    >🗂️ Records</button>
+                  </div>
                   <div className='flex gap-1 mt-1'>
                     <button
                       onClick={() => setChatAppt(item)}
@@ -232,6 +240,10 @@ const DoctorAppointments = () => {
                     <img onClick={() => cancelAppointment(item._id)} className='w-10 cursor-pointer' src={assets.cancel_icon} alt="" />
                     <img onClick={() => completeAppointment(item._id)} className='w-10 cursor-pointer' src={assets.tick_icon} alt="" />
                   </div>
+                  <button
+                      onClick={() => setRecordsAppt(item)}
+                      className='text-[10px] border border-purple-500 text-purple-600 px-1.5 py-0.5 rounded-full hover:bg-purple-500 hover:text-white transition-all w-full text-left flex justify-center'
+                  >🗂️ View Records</button>
                   <div className='flex gap-1 mt-1'>
                     <button
                       onClick={() => setChatAppt(item)}
@@ -276,6 +288,17 @@ const DoctorAppointments = () => {
           appointmentId={videoAppt._id}
           currentUserName={profileData.name}
           onClose={() => setVideoAppt(null)}
+        />
+      )}
+
+      {/* ── Patient Records Modal ── */}
+      {recordsAppt && (
+        <PatientRecordsModal
+          patientId={recordsAppt.userId}
+          patientName={recordsAppt.userData.name}
+          dToken={dToken}
+          backendUrl={backendUrl}
+          onClose={() => setRecordsAppt(null)}
         />
       )}
     </div>

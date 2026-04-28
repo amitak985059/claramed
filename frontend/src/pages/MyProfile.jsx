@@ -3,6 +3,7 @@ import { AppContext } from '../context/AppContext'
 import axios from 'axios'
 import { toast } from 'react-toastify'
 import { assets } from '../assets/assets'
+import SmartRecords from '../components/SmartRecords'
 
 const MyProfile = () => {
 
@@ -112,7 +113,11 @@ const MyProfile = () => {
 
                 </div>
             </div>
-            <div className='mt-10'>
+
+            {/* AI Smart Records Section */}
+            <SmartRecords />
+
+            <div className='mt-10 mb-20'>
 
                 {isEdit
                     ? <button onClick={updateUserProfileData} className='border border-primary px-8 py-2 rounded-full hover:bg-primary hover:text-white transition-all dark:text-gray-200'>Save information</button>

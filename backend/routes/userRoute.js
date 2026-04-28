@@ -2,7 +2,8 @@ import express from 'express';
 import {
     loginUser, registerUser, getProfile, updateProfile,
     bookAppointment, listAppointment, cancelAppointment,
-    paymentRazorpay, verifyRazorpay, paymentStripe, verifyStripe
+    paymentRazorpay, verifyRazorpay, paymentStripe, verifyStripe,
+    uploadMedicalRecord, getMedicalRecords
 } from '../controllers/userController.js';
 import { addReview, getDoctorReviews, getAppointmentReview } from '../controllers/reviewController.js';
 import { getPrescription, myPrescriptions } from '../controllers/prescriptionController.js';
@@ -38,5 +39,9 @@ userRouter.get("/doctor-reviews/:docId", getDoctorReviews)
 // ─── Prescriptions ─────────────────────────────────────────────────────────────
 userRouter.get("/prescription/:appointmentId", authUser, getPrescription)
 userRouter.get("/my-prescriptions", authUser, myPrescriptions)
+
+// ─── AI Smart Records ──────────────────────────────────────────────────────────
+userRouter.post("/upload-record", upload.single('image'), authUser, uploadMedicalRecord)
+userRouter.get("/records", authUser, getMedicalRecords)
 
 export default userRouter;

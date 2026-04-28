@@ -6,6 +6,9 @@ import userModel from "../models/userModel.js";
 import doctorModel from "../models/doctorModel.js";
 import appointmentModel from "../models/appointmentModel.js";
 import { v2 as cloudinary } from 'cloudinary'
+import { GoogleGenerativeAI } from "@google/generative-ai";
+import fs from "fs";
+import medicalRecordModel from "../models/medicalRecordModel.js";
 import stripe from "stripe";
 import razorpay from 'razorpay';
 import { sendBookingConfirmation, sendCancellationEmail } from '../utils/emailService.js'
@@ -340,8 +343,69 @@ const verifyStripe = async (req, res) => {
     }
 }
 
+// ─── AI Smart Records ───────────────────────────────────────────────────────────
+const uploadMedicalRecord = async (req, res) => {
+    try {
+        const { userId, title } = req.body;
+        const imageFile = req.file;
+
+        if (!title || !imageFile) {
+            return res.status(400).json({ success: false, message: "Missing title or file" });
+        }
+
+        if (!process.env.GEMINI_API_KEY) {
+            return res.status(500).json({ success: false, message: "GEMINI_API_KEY is not configured on the backend." });
+        }
+
+        // Upload to cloudinary
+        const imageUpload = await cloudinary.uploader.upload(imageFile.path, { resource_type: "image" });
+
+        // Summarize with Gemini
+        const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+        const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+
+        const imagePart = {
+            inlineData: {
+                data: Buffer.from(fs.readFileSync(imageFile.path)).toString("base64"),
+                mimeType: imageFile.mimetype || "image/jpeg"
+            }
+        };
+
+        const prompt = "You are a medical assistant AI. Read this medical document/lab report. Extract key anomalies, high/low values, and provide a short summary for a doctor. Use bullet points.";
+        const result = await model.generateContent([prompt, imagePart]);
+        const summary = result.response.text();
+
+        const newRecord = new medicalRecordModel({
+            userId,
+            title,
+            fileUrl: imageUpload.secure_url,
+            summary,
+            date: Date.now()
+        });
+
+        await newRecord.save();
+        res.status(201).json({ success: true, message: "Record uploaded and summarized", record: newRecord });
+
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ success: false, message: error.message });
+    }
+}
+
+const getMedicalRecords = async (req, res) => {
+    try {
+        const { userId } = req.body; 
+        const records = await medicalRecordModel.find({ userId }).sort({ date: -1 });
+        res.json({ success: true, records });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ success: false, message: error.message });
+    }
+}
+
 export {
     loginUser, registerUser, getProfile, updateProfile,
     bookAppointment, listAppointment, cancelAppointment,
-    paymentRazorpay, verifyRazorpay, paymentStripe, verifyStripe
+    paymentRazorpay, verifyRazorpay, paymentStripe, verifyStripe,
+    uploadMedicalRecord, getMedicalRecords
 }
