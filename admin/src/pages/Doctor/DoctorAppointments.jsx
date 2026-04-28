@@ -1,12 +1,13 @@
-import React, { useContext, useEffect, useState } from 'react'
+import React, { useContext, useEffect, useState, useRef } from 'react'
 import { DoctorContext } from '../../context/DoctorContext'
 import { AppContext } from '../../context/AppContext'
 import { assets } from '../../assets/assets'
 import axios from 'axios'
 import { toast } from 'react-toastify'
+import ProPaywall from '../../components/ProPaywall'
 
 // ─── Prescription Editor Modal ────────────────────────────────────────────────
-const PrescriptionEditor = ({ appointment, dToken, backendUrl, onClose }) => {
+const PrescriptionEditor = ({ appointment, dToken, backendUrl, onClose, profileData, getProfileData }) => {
   const [form, setForm] = useState({
     diagnosis: '',
     notes: '',
@@ -14,6 +15,12 @@ const PrescriptionEditor = ({ appointment, dToken, backendUrl, onClose }) => {
     medicines: [{ name: '', dosage: '', duration: '', notes: '' }]
   })
   const [saving, setSaving] = useState(false)
+  const [showPaywall, setShowPaywall] = useState(false)
+  const [isDictating, setIsDictating] = useState(false)
+  
+  // Refs for continuous speech recognition
+  const recognitionRef = useRef(null)
+  const accumulatedTranscriptRef = useRef('')
 
   // Load existing prescription
   useEffect(() => {
@@ -71,7 +78,123 @@ const PrescriptionEditor = ({ appointment, dToken, backendUrl, onClose }) => {
     finally { setSaving(false) }
   }
 
+  const processVoiceTranscript = async (transcript) => {
+      if (!transcript || transcript.trim() === '') {
+          toast.info("No speech detected.");
+          return;
+      }
+      
+      toast.info("Processing voice...", { autoClose: false, toastId: "processingVoice" });
+
+      try {
+        const { data } = await axios.post(
+          backendUrl + '/api/doctor/parse-prescription',
+          { text: transcript },
+          { headers: { dToken } }
+        );
+
+        if (data.success && data.data) {
+          const aiData = data.data;
+          setForm(prev => ({
+            ...prev,
+            diagnosis: aiData.diagnosis || prev.diagnosis,
+            notes: aiData.notes || prev.notes,
+            followUpDate: aiData.followUpDate || prev.followUpDate,
+            medicines: aiData.medicines && aiData.medicines.length > 0 ? aiData.medicines : prev.medicines
+          }));
+          toast.dismiss("processingVoice");
+          toast.success("Prescription generated from voice!");
+        } else {
+          toast.dismiss("processingVoice");
+          toast.error("Could not parse prescription");
+        }
+      } catch (error) {
+        toast.dismiss("processingVoice");
+        toast.error("Error connecting to AI service");
+        console.error(error);
+      }
+  }
+
+  const handleDictation = () => {
+    if (!profileData?.isPro) {
+      setShowPaywall(true)
+      return
+    }
+
+    // If already dictating, stop it manually
+    if (isDictating) {
+      if (recognitionRef.current) {
+        recognitionRef.current.stop();
+      }
+      // We do NOT call processVoiceTranscript here. 
+      // Calling stop() will force the API to fire onresult one last time, and then onend.
+      // We let onend handle the processing so we don't miss the last sentence!
+      return;
+    }
+
+    // Start new dictation
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      toast.error("Your browser does not support Voice Dictation. Please use Chrome.");
+      return;
+    }
+
+    accumulatedTranscriptRef.current = '';
+    const recognition = new SpeechRecognition();
+    recognition.continuous = true;
+    recognition.interimResults = true; // Use interim results so we don't miss text
+    recognition.lang = 'en-US';
+    
+    recognitionRef.current = recognition;
+
+    recognition.onstart = () => {
+      setIsDictating(true);
+      toast.info("Recording... Click the button again to stop.", { autoClose: 3000 });
+    };
+
+    recognition.onerror = (event) => {
+      if (event.error !== 'aborted') {
+          setIsDictating(false);
+          toast.error("Error recognizing voice: " + event.error);
+      }
+    };
+
+    recognition.onend = () => {
+      // The API has completely stopped listening.
+      setIsDictating(false);
+      processVoiceTranscript(accumulatedTranscriptRef.current);
+    };
+
+    recognition.onresult = (event) => {
+      let currentTranscript = '';
+      for (let i = 0; i < event.results.length; i++) {
+        currentTranscript += event.results[i][0].transcript + ' ';
+      }
+      accumulatedTranscriptRef.current = currentTranscript;
+    };
+
+    recognition.start();
+  }
+
   const inputCls = 'border rounded px-2 py-1 text-sm w-full outline-primary focus:ring-1 focus:ring-primary/30'
+
+  if (showPaywall) {
+    return (
+      <div className='fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4'>
+        <div className='relative bg-transparent w-full max-w-2xl'>
+            <button onClick={() => setShowPaywall(false)} className='absolute -top-10 right-0 text-white hover:text-gray-300 text-3xl font-bold'>&times;</button>
+            <ProPaywall 
+                featureName="AI Voice Prescriptions" 
+                onUpgrade={() => {
+                  getProfileData(); 
+                  setShowPaywall(false);
+                  toast.success("Unlocked! Click Dictate again.");
+                }} 
+            />
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className='fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4'>
@@ -81,7 +204,16 @@ const PrescriptionEditor = ({ appointment, dToken, backendUrl, onClose }) => {
             <p className='text-white font-bold text-lg'>📋 Prescription</p>
             <p className='text-emerald-100 text-xs'>Patient: {appointment.userData.name}</p>
           </div>
-          <button onClick={onClose} className='text-white/70 hover:text-white text-xl'>✕</button>
+          <div className='flex items-center gap-3'>
+            <button 
+              onClick={handleDictation}
+              className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold transition-all ${isDictating ? 'bg-red-500 text-white animate-pulse shadow-lg shadow-red-500/40' : 'bg-white text-emerald-700 hover:bg-emerald-50 shadow'}`}
+            >
+              <span className='text-base'>{isDictating ? '🛑' : '🎙️'}</span> 
+              {isDictating ? 'Stop Dictating' : (profileData?.isPro ? 'AI Dictate' : 'AI Dictate (Pro)')}
+            </button>
+            <button onClick={onClose} className='text-white/70 hover:text-white text-xl'>✕</button>
+          </div>
         </div>
 
         <div className='p-6 space-y-5'>
@@ -262,12 +394,14 @@ const DoctorAppointments = () => {
       </div>
 
       {/* ── Prescription Editor Modal ── */}
-      {prescriptionAppt && (
+      {prescriptionAppt && profileData && (
         <PrescriptionEditor
           appointment={prescriptionAppt}
           dToken={dToken}
           backendUrl={backendUrl}
           onClose={() => setPrescriptionAppt(null)}
+          profileData={profileData}
+          getProfileData={getProfileData}
         />
       )}
 

@@ -27,6 +27,9 @@ const doctorSchema = new mongoose.Schema({
     averageRating: { type: Number, default: 0 },
     totalReviews: { type: Number, default: 0 },
 
+    // ── SaaS Subscription ──────────────────────────────────────────────────────
+    isPro: { type: Boolean, default: false },
+
 }, { minimize: false })
 
 // ─── Indexes for query performance ────────────────────────────────────────────

@@ -4,6 +4,7 @@ import doctorModel from "../models/doctorModel.js";
 import appointmentModel from "../models/appointmentModel.js";
 import medicalRecordModel from "../models/medicalRecordModel.js";
 import { sendCompletionEmail } from '../utils/emailService.js'
+import { GoogleGenerativeAI } from "@google/generative-ai";
 
 // ─── Helper: issue short-lived access token ───────────────────────────────────
 const signDoctorToken = (id) =>
@@ -267,9 +268,79 @@ const submitReportReview = async (req, res) => {
     }
 }
 
+// ─── Pro SaaS Upgrade ─────────────────────────────────────────────────────────
+const upgradeToPro = async (req, res) => {
+    try {
+        const { docId } = req.body;
+        // In a real app, this would be a Stripe Webhook endpoint. 
+        // For MVP demo, we simply upgrade instantly.
+        await doctorModel.findByIdAndUpdate(docId, { isPro: true });
+        res.json({ success: true, message: "Upgraded to Claramed Pro successfully! 💎" });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ success: false, message: error.message });
+    }
+}
+
+// ─── AI Voice Prescription Parsing ────────────────────────────────────────────
+const parsePrescriptionText = async (req, res) => {
+    try {
+        const { text } = req.body;
+        if (!text) return res.status(400).json({ success: false, message: "No text provided" });
+
+        const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+        const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+
+        const today = new Date().toISOString().split('T')[0];
+
+        const prompt = `
+        You are a medical assistant parsing a doctor's spoken dictation.
+        Extract the following information from the text into a strict JSON format.
+        Today's date is ${today}. Use this to calculate the follow-up date.
+        Do not include any markdown formatting like \`\`\`json or \`\`\`. Just return raw JSON.
+        
+        Text: "${text}"
+        
+        Expected JSON format:
+        {
+            "diagnosis": "string (the primary diagnosis or condition mentioned)",
+            "notes": "string (any general advice, diet, or doctor's notes)",
+            "followUpDate": "string (YYYY-MM-DD format based on today's date if a follow up is mentioned, otherwise empty string)",
+            "medicines": [
+                {
+                    "name": "string (name of the medicine)",
+                    "dosage": "string (e.g. 500mg, 1 tablet, 5ml)",
+                    "duration": "string (e.g. 3 days, 1 week)",
+                    "notes": "string (instructions like 'after meals', 'twice a day')"
+                }
+            ]
+        }
+        
+        If a field is missing, leave it as an empty string. Return ONLY the JSON object.
+        `;
+
+        const result = await model.generateContent(prompt);
+        let responseText = result.response.text().trim();
+        
+        // Strip markdown backticks if Gemini includes them
+        if (responseText.startsWith('\`\`\`json')) {
+            responseText = responseText.replace(/\`\`\`json/g, '').replace(/\`\`\`/g, '').trim();
+        } else if (responseText.startsWith('\`\`\`')) {
+            responseText = responseText.replace(/\`\`\`/g, '').trim();
+        }
+
+        const parsedData = JSON.parse(responseText);
+        res.json({ success: true, data: parsedData });
+
+    } catch (error) {
+        console.error("AI Parsing Error:", error);
+        res.status(500).json({ success: false, message: "Failed to parse dictation" });
+    }
+}
+
 export {
     loginDoctor, appointmentsDoctor, appointmentCancel,
     doctorList, changeAvailablity, appointmentComplete,
     doctorDashboard, doctorProfile, updateDoctorProfile, updateSchedule,
-    getPatientRecords, getPendingReviews, submitReportReview
+    getPatientRecords, getPendingReviews, submitReportReview, upgradeToPro, parsePrescriptionText
 }

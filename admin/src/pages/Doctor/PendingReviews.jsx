@@ -3,6 +3,7 @@ import { DoctorContext } from '../../context/DoctorContext'
 import { AppContext } from '../../context/AppContext'
 import axios from 'axios'
 import { toast } from 'react-toastify'
+import ProPaywall from '../../components/ProPaywall'
 
 const PendingReviews = () => {
     const { dToken, profileData, getProfileData } = useContext(DoctorContext)
@@ -63,6 +64,17 @@ const PendingReviews = () => {
             }
         }
     }, [dToken, profileData])
+
+    if (profileData && !profileData.isPro) {
+        return (
+            <div className='m-5'>
+                <ProPaywall 
+                    featureName="Paid Report Reviews" 
+                    onUpgrade={() => getProfileData()} 
+                />
+            </div>
+        )
+    }
 
     return (
         <div className='w-full max-w-6xl m-5'>

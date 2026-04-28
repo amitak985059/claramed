@@ -3,7 +3,7 @@ import {
     loginDoctor, appointmentsDoctor, appointmentCancel,
     doctorList, changeAvailablity, appointmentComplete,
     doctorDashboard, doctorProfile, updateDoctorProfile, updateSchedule,
-    getPatientRecords, getPendingReviews, submitReportReview
+    getPatientRecords, getPendingReviews, submitReportReview, upgradeToPro, parsePrescriptionText
 } from '../controllers/doctorController.js';
 import { savePrescription, getPrescription } from '../controllers/prescriptionController.js';
 import authDoctor from '../middleware/authDoctor.js';
@@ -30,9 +30,11 @@ doctorRouter.post("/update-schedule", authDoctor, updateSchedule)
 doctorRouter.post("/prescription", authDoctor, savePrescription)
 doctorRouter.get("/prescription/:appointmentId", authDoctor, getPrescription)
 
-// ─── AI Smart Records ──────────────────────────────────────────────────────────
+// ─── AI Smart Records & SaaS ───────────────────────────────────────────────────
 doctorRouter.get("/patient-records", authDoctor, getPatientRecords)
 doctorRouter.get("/pending-reviews", authDoctor, getPendingReviews)
 doctorRouter.post("/submit-review", authDoctor, submitReportReview)
+doctorRouter.post("/upgrade-pro", authDoctor, upgradeToPro)
+doctorRouter.post("/parse-prescription", authDoctor, parsePrescriptionText)
 
 export default doctorRouter;
