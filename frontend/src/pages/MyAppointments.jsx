@@ -5,6 +5,7 @@ import axios from 'axios'
 import { toast } from 'react-toastify'
 import { assets } from '../assets/assets'
 import ChatWindow from '../components/ChatWindow'
+import VideoCallWindow from '../components/VideoCallWindow'
 
 // ─── Star picker ──────────────────────────────────────────────────────────────
 const StarPicker = ({ value, onChange }) => (
@@ -75,6 +76,7 @@ const MyAppointments = () => {
     const [reviewForm, setReviewForm] = useState({ rating: 0, comment: '' })
     const [submitting, setSubmitting] = useState(false)
     const [chatAppt, setChatAppt] = useState(null)   // appointment being chatted
+    const [videoAppt, setVideoAppt] = useState(null) // appointment in video call
     const [prescriptions, setPrescriptions] = useState({})     // appointmentId → prescription
     const [viewPrescription, setViewPrescription] = useState(null)
 
@@ -218,12 +220,20 @@ const MyAppointments = () => {
                                 {item.isCompleted &&
                                     <button className='sm:min-w-48 py-2 border border-green-500 rounded text-green-500'>Completed</button>}
 
-                                {/* ── Chat Button (active, non-cancelled appointments) ── */}
+                                {/* ── Chat & Video Buttons (active, non-cancelled appointments) ── */}
                                 {!item.cancelled && (
-                                    <button
-                                        onClick={() => setChatAppt(item)}
-                                        className='sm:min-w-48 py-2 border border-primary rounded text-primary hover:bg-primary hover:text-white transition-all duration-300'
-                                    >💬 Chat with Doctor</button>
+                                    <div className='flex gap-2 sm:min-w-48'>
+                                        <button
+                                            onClick={() => setChatAppt(item)}
+                                            className='flex-1 py-2 border border-primary rounded text-primary hover:bg-primary hover:text-white transition-all duration-300 text-sm'
+                                            title="Chat with Doctor"
+                                        >💬 Chat</button>
+                                        <button
+                                            onClick={() => setVideoAppt(item)}
+                                            className='flex-1 py-2 border border-blue-500 rounded text-blue-500 hover:bg-blue-500 hover:text-white transition-all duration-300 text-sm'
+                                            title="Join Video Call"
+                                        >📹 Video</button>
+                                    </div>
                                 )}
 
                                 {/* ── Prescription button ── */}
@@ -287,6 +297,15 @@ const MyAppointments = () => {
                     currentUserRole='user'
                     currentUserName={userData.name}
                     onClose={() => setChatAppt(null)}
+                />
+            )}
+
+            {/* ── Video Call Window ── */}
+            {videoAppt && userData && (
+                <VideoCallWindow
+                    appointmentId={videoAppt._id}
+                    currentUserName={userData.name}
+                    onClose={() => setVideoAppt(null)}
                 />
             )}
         </div>

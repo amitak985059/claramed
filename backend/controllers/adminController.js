@@ -98,7 +98,7 @@ const addDoctor = async (req, res) => {
         const { name, email, password, speciality, degree, experience, about, fees, address } = req.body
         const imageFile = req.file
 
-        if (!name || !email || !password || !speciality || !degree || !experience || !about || !fees || !address) {
+        if (!name || !email || !password || !speciality || !degree || !experience || !fees || !address) {
             return res.status(400).json({ success: false, message: "Missing Details" })
         }
         if (!validator.isEmail(email)) {
@@ -126,7 +126,7 @@ const addDoctor = async (req, res) => {
             name, email,
             image: imageUpload.secure_url,
             password: hashedPassword,
-            speciality, degree, experience, about, fees,
+            speciality, degree, experience, about: about || 'No details provided.', fees,
             address: JSON.parse(address),
             date: Date.now()
         }
