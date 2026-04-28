@@ -4,12 +4,13 @@ import { AppContext } from '../context/AppContext'
 import { toast } from 'react-toastify'
 
 const SmartRecords = () => {
-    const { backendUrl, token } = useContext(AppContext)
+    const { backendUrl, token, doctors } = useContext(AppContext)
     const [records, setRecords] = useState([])
     const [loading, setLoading] = useState(false)
     const [uploading, setUploading] = useState(false)
     const [title, setTitle] = useState('')
     const [file, setFile] = useState(null)
+    const [selectedDocId, setSelectedDocId] = useState('')
 
     const fetchRecords = async () => {
         try {
@@ -52,6 +53,25 @@ const SmartRecords = () => {
             toast.error(error.response?.data?.message || "Upload failed")
         } finally {
             setUploading(false)
+        }
+    }
+
+    const requestReview = async (recordId) => {
+        if (!selectedDocId) {
+            toast.error("Please select a doctor for review");
+            return;
+        }
+        try {
+            const { data } = await axios.post(backendUrl + '/api/user/request-review', { recordId, docId: selectedDocId }, { headers: { token } })
+            if (data.success) {
+                toast.success(data.message)
+                fetchRecords()
+            } else {
+                toast.error(data.message)
+            }
+        } catch (error) {
+            console.error(error)
+            toast.error(error.response?.data?.message || "Failed to request review")
         }
     }
 
@@ -110,7 +130,11 @@ const SmartRecords = () => {
                     {records.map((record) => (
                         <div key={record._id} className='border dark:border-gray-700 rounded-xl overflow-hidden'>
                             <div className='bg-gray-50 dark:bg-gray-800 px-4 py-3 border-b dark:border-gray-700 flex justify-between items-center'>
-                                <h3 className='font-medium text-gray-800 dark:text-gray-200'>{record.title}</h3>
+                                <div className='flex items-center gap-3'>
+                                    <h3 className='font-medium text-gray-800 dark:text-gray-200'>{record.title}</h3>
+                                    {record.status === 'Pending Review' && <span className='text-[10px] bg-orange-100 text-orange-600 px-2 py-0.5 rounded-full font-medium'>⏳ Pending Review</span>}
+                                    {record.status === 'Reviewed' && <span className='text-[10px] bg-green-100 text-green-600 px-2 py-0.5 rounded-full font-medium'>✅ Reviewed</span>}
+                                </div>
                                 <a 
                                     href={record.fileUrl} 
                                     target="_blank" 
@@ -127,6 +151,42 @@ const SmartRecords = () => {
                                 <div className='text-sm text-gray-600 dark:text-gray-400 whitespace-pre-wrap leading-relaxed'>
                                     {record.summary}
                                 </div>
+                                
+                                {/* Doctor Review Section */}
+                                {record.status === 'Self' && (
+                                    <div className='mt-4 pt-4 border-t border-gray-100 dark:border-gray-700'>
+                                        <p className='text-xs text-gray-500 mb-2'>Want a human doctor to review this report?</p>
+                                        <div className='flex gap-2 items-center'>
+                                            <select 
+                                                className='border rounded text-xs px-2 py-1.5 dark:bg-gray-800 dark:border-gray-600 outline-none flex-1 max-w-[200px]'
+                                                value={selectedDocId}
+                                                onChange={(e) => setSelectedDocId(e.target.value)}
+                                            >
+                                                <option value="">Select Doctor</option>
+                                                {doctors.map(doc => (
+                                                    <option key={doc._id} value={doc._id}>{doc.name} ({doc.speciality})</option>
+                                                ))}
+                                            </select>
+                                            <button 
+                                                onClick={() => requestReview(record._id)}
+                                                className='bg-purple-600 text-white text-xs px-4 py-1.5 rounded hover:bg-purple-700 transition-colors'
+                                            >
+                                                Pay ₹199 & Send
+                                            </button>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {record.status === 'Reviewed' && (
+                                    <div className='mt-4 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-100 dark:border-blue-800'>
+                                        <p className='text-xs font-semibold text-blue-700 dark:text-blue-400 mb-1 flex items-center gap-1'>
+                                            👨‍⚕️ Doctor's Note
+                                        </p>
+                                        <p className='text-sm text-gray-700 dark:text-gray-300'>
+                                            {record.doctorNote}
+                                        </p>
+                                    </div>
+                                )}
                             </div>
                         </div>
                     ))}

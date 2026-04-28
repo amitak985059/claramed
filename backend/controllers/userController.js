@@ -396,7 +396,25 @@ const getMedicalRecords = async (req, res) => {
     try {
         const { userId } = req.body; 
         const records = await medicalRecordModel.find({ userId }).sort({ date: -1 });
+        // Populate doctor names if possible, but for MVP just return records
         res.json({ success: true, records });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ success: false, message: error.message });
+    }
+}
+
+const requestReportReview = async (req, res) => {
+    try {
+        const { userId, recordId, docId } = req.body;
+        const record = await medicalRecordModel.findById(recordId);
+        if (!record || record.userId !== userId) {
+            return res.status(404).json({ success: false, message: "Record not found" });
+        }
+        record.docId = docId;
+        record.status = 'Pending Review';
+        await record.save();
+        res.json({ success: true, message: "Review requested successfully" });
     } catch (error) {
         console.error(error);
         res.status(500).json({ success: false, message: error.message });
@@ -407,5 +425,5 @@ export {
     loginUser, registerUser, getProfile, updateProfile,
     bookAppointment, listAppointment, cancelAppointment,
     paymentRazorpay, verifyRazorpay, paymentStripe, verifyStripe,
-    uploadMedicalRecord, getMedicalRecords
+    uploadMedicalRecord, getMedicalRecords, requestReportReview
 }

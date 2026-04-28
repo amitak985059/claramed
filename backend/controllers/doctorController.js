@@ -234,9 +234,42 @@ const getPatientRecords = async (req, res) => {
     }
 }
 
+// ─── Paid Report Review ────────────────────────────────────────────────────────
+const getPendingReviews = async (req, res) => {
+    try {
+        const { docId } = req.body;
+        // Find records assigned to this doctor that are pending review
+        const records = await medicalRecordModel.find({ docId, status: 'Pending Review' }).sort({ date: 1 });
+        res.json({ success: true, records });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ success: false, message: error.message });
+    }
+}
+
+const submitReportReview = async (req, res) => {
+    try {
+        const { docId, recordId, doctorNote } = req.body;
+        const record = await medicalRecordModel.findById(recordId);
+        
+        if (!record || record.docId !== docId) {
+            return res.status(404).json({ success: false, message: "Record not found or unauthorized" });
+        }
+        
+        record.doctorNote = doctorNote;
+        record.status = 'Reviewed';
+        await record.save();
+
+        res.json({ success: true, message: "Review submitted successfully" });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ success: false, message: error.message });
+    }
+}
+
 export {
     loginDoctor, appointmentsDoctor, appointmentCancel,
     doctorList, changeAvailablity, appointmentComplete,
     doctorDashboard, doctorProfile, updateDoctorProfile, updateSchedule,
-    getPatientRecords
+    getPatientRecords, getPendingReviews, submitReportReview
 }
