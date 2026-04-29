@@ -103,7 +103,7 @@ app.get("/api/chat/:appointmentId", async (req, res) => {
   }
 })
 
-app.get("/", (req, res) => res.send("API Working"))
+app.get("/", (req, res) => res.send("API Working full flegit 100"))
 
 // ─── Global error handler ─────────────────────────────────────────────────────
 app.use(errorHandler)
