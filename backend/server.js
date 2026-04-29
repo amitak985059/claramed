@@ -21,6 +21,9 @@ const app = express()
 const httpServer = createServer(app)
 const port = process.env.PORT || 4000
 
+// Trust proxy (required for express-rate-limit on Render/cloud platforms)
+app.set('trust proxy', 1)
+
 connectDB()
 connectCloudinary()
 
