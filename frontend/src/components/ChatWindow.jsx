@@ -24,15 +24,17 @@ const ChatWindow = ({ appointmentId, currentUserId, currentUserRole, currentUser
             .then(res => { if (res.data.success) setMessages(res.data.messages) })
             .catch(() => { })
 
-        // Connect socket
-        socket = io(BACKEND_URL, { transports: ['websocket', 'polling'] })
+        // Connect socket — pass JWT so the server can verify identity
+        const token = localStorage.getItem('token')
+        socket = io(BACKEND_URL, {
+            transports: ['websocket', 'polling'],
+            auth: { token }
+        })
 
         socket.on('connect', () => {
             setConnected(true)
             socket.emit('join_room', {
                 appointmentId,
-                userId: currentUserId,
-                role: currentUserRole,
                 name: currentUserName
             })
         })
@@ -69,8 +71,6 @@ const ChatWindow = ({ appointmentId, currentUserId, currentUserRole, currentUser
         if (!input.trim() || !socket) return
         socket.emit('send_message', {
             appointmentId,
-            senderId: currentUserId,
-            senderRole: currentUserRole,
             senderName: currentUserName,
             message: input.trim()
         })

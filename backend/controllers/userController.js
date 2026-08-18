@@ -6,7 +6,7 @@ import userModel from "../models/userModel.js";
 import doctorModel from "../models/doctorModel.js";
 import appointmentModel from "../models/appointmentModel.js";
 import { v2 as cloudinary } from 'cloudinary'
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { getGeminiModel, generateWithRetry } from "../utils/geminiClient.js";
 import fs from "fs";
 import medicalRecordModel from "../models/medicalRecordModel.js";
 import stripe from "stripe";
@@ -357,23 +357,26 @@ const uploadMedicalRecord = async (req, res) => {
             return res.status(500).json({ success: false, message: "GEMINI_API_KEY is not configured on the backend." });
         }
 
-        // Upload to cloudinary
+        // Upload to cloudinary, then immediately free the temp file from disk
         const imageUpload = await cloudinary.uploader.upload(imageFile.path, { resource_type: "image" });
 
-        // Summarize with Gemini
-        const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-        const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+        // Read file for Gemini before unlinking
+        const imageBase64 = Buffer.from(fs.readFileSync(imageFile.path)).toString("base64");
+        const imageMimeType = imageFile.mimetype || "image/jpeg";
 
+        // Delete temp file from disk (non-blocking, best-effort)
+        fs.unlink(imageFile.path, (unlinkErr) => {
+            if (unlinkErr) console.warn("[Upload] Failed to delete temp file:", unlinkErr.message);
+        });
+
+        // Summarize with shared Gemini singleton + retry
+        const model = getGeminiModel("gemini-2.5-flash");
         const imagePart = {
-            inlineData: {
-                data: Buffer.from(fs.readFileSync(imageFile.path)).toString("base64"),
-                mimeType: imageFile.mimetype || "image/jpeg"
-            }
+            inlineData: { data: imageBase64, mimeType: imageMimeType }
         };
 
         const prompt = "You are a medical assistant AI. Read this medical document/lab report. Extract key anomalies, high/low values, and provide a short summary for a doctor. Use bullet points.";
-        const result = await model.generateContent([prompt, imagePart]);
-        const summary = result.response.text();
+        const summary = await generateWithRetry(model, [prompt, imagePart]);
 
         const newRecord = new medicalRecordModel({
             userId,
@@ -387,6 +390,10 @@ const uploadMedicalRecord = async (req, res) => {
         res.status(201).json({ success: true, message: "Record uploaded and summarized", record: newRecord });
 
     } catch (error) {
+        // Best-effort cleanup if something failed after multer saved the file
+        if (req.file?.path) {
+            fs.unlink(req.file.path, () => {});
+        }
         console.error(error);
         res.status(500).json({ success: false, message: error.message });
     }

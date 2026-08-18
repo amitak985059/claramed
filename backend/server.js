@@ -5,6 +5,7 @@ import mongoose from 'mongoose'
 import cors from 'cors'
 import helmet from 'helmet'
 import rateLimit from 'express-rate-limit'
+import jwt from 'jsonwebtoken'
 import 'dotenv/config'
 import connectDB from "./config/mongodb.js"
 import connectCloudinary from "./config/cloudinary.js"
@@ -117,12 +118,32 @@ const io = new Server(httpServer, {
   }
 })
 
+// ─── Socket.io JWT authentication middleware ──────────────────────────────────
+// Clients must pass their JWT in socket.handshake.auth.token
+io.use((socket, next) => {
+  const token = socket.handshake.auth?.token
+  if (!token) {
+    return next(new Error('Authentication required: no token provided'))
+  }
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET)
+    // Attach verified identity to socket — never trust client-supplied userId/role
+    socket.data.userId = decoded.id
+    socket.data.role   = decoded.role   // 'user' | 'doctor'
+    next()
+  } catch (err) {
+    next(new Error('Authentication failed: invalid or expired token'))
+  }
+})
+
 // Track which socket is in which room
 const onlineUsers = new Map()   // socketId → { userId, role, name }
 
 io.on('connection', (socket) => {
   // Join an appointment chat room
-  socket.on('join_room', ({ appointmentId, userId, role, name }) => {
+  // Use server-verified identity from socket.data — ignore any userId/role sent by client
+  socket.on('join_room', ({ appointmentId, name }) => {
+    const { userId, role } = socket.data
     socket.join(appointmentId)
     onlineUsers.set(socket.id, { userId, role, name, appointmentId })
 
@@ -130,9 +151,10 @@ io.on('connection', (socket) => {
     socket.to(appointmentId).emit('user_joined', { name, role })
   })
 
-  // Handle incoming message
-  socket.on('send_message', async ({ appointmentId, senderId, senderRole, senderName, message }) => {
+  // Handle incoming message — use server-verified senderId & senderRole
+  socket.on('send_message', async ({ appointmentId, senderName, message }) => {
     if (!message?.trim()) return
+    const { userId: senderId, role: senderRole } = socket.data
 
     try {
       const saved = await messageModel.create({

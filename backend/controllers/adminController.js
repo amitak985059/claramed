@@ -1,5 +1,6 @@
 import jwt from "jsonwebtoken";
 import bcrypt from "bcrypt";
+import fs from "fs";
 import validator from "validator";
 import { v2 as cloudinary } from "cloudinary";
 import appointmentModel from "../models/appointmentModel.js";
@@ -122,6 +123,11 @@ const addDoctor = async (req, res) => {
 
         const imageUpload = await cloudinary.uploader.upload(imageFile.path, { resource_type: "image" })
 
+        // Delete temp file from disk after successful Cloudinary upload (best-effort)
+        fs.unlink(imageFile.path, (unlinkErr) => {
+            if (unlinkErr) console.warn("[Upload] Failed to delete temp file:", unlinkErr.message);
+        });
+
         const doctorData = {
             name, email,
             image: imageUpload.secure_url,
@@ -135,6 +141,10 @@ const addDoctor = async (req, res) => {
         res.status(201).json({ success: true, message: 'Doctor Added' })
 
     } catch (error) {
+        // Best-effort cleanup if something failed after multer saved the file
+        if (req.file?.path) {
+            fs.unlink(req.file.path, () => {});
+        }
         console.error(error)
         res.status(500).json({ success: false, message: error.message })
     }

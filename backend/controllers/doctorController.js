@@ -4,7 +4,7 @@ import doctorModel from "../models/doctorModel.js";
 import appointmentModel from "../models/appointmentModel.js";
 import medicalRecordModel from "../models/medicalRecordModel.js";
 import { sendCompletionEmail } from '../utils/emailService.js'
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { getGeminiModel, generateWithRetry } from "../utils/geminiClient.js";
 
 // ─── Helper: issue short-lived access token ───────────────────────────────────
 const signDoctorToken = (id) =>
@@ -288,9 +288,7 @@ const parsePrescriptionText = async (req, res) => {
         const { text } = req.body;
         if (!text) return res.status(400).json({ success: false, message: "No text provided" });
 
-        const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-        const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
-
+        const genAI = getGeminiModel("gemini-2.5-flash");
         const today = new Date().toISOString().split('T')[0];
 
         const prompt = `
@@ -319,8 +317,8 @@ const parsePrescriptionText = async (req, res) => {
         If a field is missing, leave it as an empty string. Return ONLY the JSON object.
         `;
 
-        const result = await model.generateContent(prompt);
-        let responseText = result.response.text().trim();
+        let responseText = await generateWithRetry(genAI, [prompt]);
+        responseText = responseText.trim();
         
         // Strip markdown backticks if Gemini includes them
         if (responseText.startsWith('\`\`\`json')) {
