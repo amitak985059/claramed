@@ -1,0 +1,70 @@
+name: Build and Push Docker Images
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'  # Triggers on tags like v1.0.0, v1.0.1, etc.
+    branches:
+      - main     # Also runs on push to main (optional: builds images with 'latest' tag)
+  workflow_dispatch: # Allows manual trigger from GitHub Actions UI
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry (GHCR)
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Determine image tag based on ref (tag or branch)
+      - name: Determine Image Tag
+        id: tag_info
+        run: |
+          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            echo "TAG=${GITHUB_REF_NAME}" >> $GITHUB_OUTPUT
+          else
+            echo "TAG=latest" >> $GITHUB_OUTPUT
+          fi
+
+      # ─── Build & Push Backend ──────────────────────────────────────
+      - name: Build & Push Backend
+        uses: docker/build-push-action@v5
+        with:
+          context: ./backend
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository }}/backend:${{ steps.tag_info.outputs.TAG }}
+            ghcr.io/${{ github.repository }}/backend:latest
+
+      # ─── Build & Push Frontend ─────────────────────────────────────
+      - name: Build & Push Frontend
+        uses: docker/build-push-action@v5
+        with:
+          context: ./frontend
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository }}/frontend:${{ steps.tag_info.outputs.TAG }}
+            ghcr.io/${{ github.repository }}/frontend:latest
+
+      # ─── Build & Push Admin ────────────────────────────────────────
+      - name: Build & Push Admin
+        uses: docker/build-push-action@v5
+        with:
+          context: ./admin
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository }}/admin:${{ steps.tag_info.outputs.TAG }}
+            ghcr.io/${{ github.repository }}/admin:latest
