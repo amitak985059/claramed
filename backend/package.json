@@ -4,6 +4,7 @@
   "main": "server.js",
   "type": "module",
   "scripts": {
+    "dev": "nodemon server.js",
     "start": "node server.js",
     "server": "nodemon server.js",
     "test": "NODE_OPTIONS=--experimental-vm-modules jest --runInBand",
